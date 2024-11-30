@@ -218,16 +218,43 @@ class SaeTrainer:
             # Bookkeeping for dead feature detection
             num_tokens_in_step += batch["input_ids"].numel()
 
-            # Forward pass on the model to get the next batch of activations            
-            handles = [
-                mod.register_forward_hook(hook) for mod in name_to_module.values()
-            ]
-            try:
-                with torch.no_grad():
-                    self.model(batch["input_ids"].to(device))
-            finally:
-                for handle in handles:
-                    handle.remove()
+            if self.cfg.sae.use_gradient:
+                # Register backward hooks to capture gradients
+                handles = [
+                    mod.register_full_backward_hook(hook) for mod in name_to_module.values()
+                ]
+
+                try:
+                    self.model.zero_grad()
+
+                    # Forward pass with gradient computation
+                    outputs = self.model(batch["input_ids"].to(device))
+
+                    # Compute cross entropy loss
+                    shift_logits = outputs.logits[:, :-1, :].contiguous()
+                    shift_labels = batch["input_ids"][:, 1:].to(device)
+                    loss_fct = nn.CrossEntropyLoss(reduction="mean")
+                    loss = loss_fct(
+                        shift_logits.view(-1, shift_logits.shape[-1]),
+                        shift_labels.view(-1)
+                    )
+                    loss.backward()
+
+                finally:
+                    for handle in handles:
+                        handle.remove()
+
+            else:
+                # Forward pass on the model to get the next batch of activations            
+                handles = [
+                    mod.register_forward_hook(hook) for mod in name_to_module.values()
+                ]
+                try:
+                    with torch.no_grad():
+                        self.model(batch["input_ids"].to(device))
+                finally:
+                    for handle in handles:
+                        handle.remove()
 
             if self.cfg.distribute_modules:
                 input_dict = self.scatter_hiddens(input_dict)

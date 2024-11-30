@@ -24,6 +24,8 @@ class SaeConfig(Serializable):
     multi_topk: bool = False
     """Use Multi-TopK loss."""
 
+    use_gradient: bool = False
+    """Use gradient, rather than activation."""
 
 @dataclass
 class TrainConfig(Serializable):

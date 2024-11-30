@@ -8,7 +8,7 @@ import torch
 import torch.distributed as dist
 from datasets import Dataset, load_dataset
 from simple_parsing import field, parse
-from transformers import AutoModel, AutoTokenizer, BitsAndBytesConfig, PreTrainedModel
+from transformers import AutoModel, AutoTokenizer, BitsAndBytesConfig, PreTrainedModel, AutoModelForCausalLM
 
 from .data import chunk_and_tokenize, MemmapDataset
 from .trainer import SaeTrainer, TrainConfig
@@ -69,7 +69,7 @@ def load_artifacts(args: RunConfig, rank: int) -> tuple[PreTrainedModel, Dataset
     else:
         dtype = "auto"
 
-    model = AutoModel.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         args.model,
         device_map={"": f"cuda:{rank}"},
         quantization_config=(
